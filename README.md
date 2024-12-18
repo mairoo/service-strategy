@@ -41,12 +41,118 @@ TransactionFacade
 ```
 
 ## 스프링 이벤트
+
 ```
 @TransactionalEventListener
-- TransactionCreatedEvent
-- TransferCompletedEvent
-- TransferFailedEvent
+   ├── TransactionPhase.AFTER_COMMIT
+   │     └── 성공 시 후처리(알림 발송 등)
+   └── TransactionPhase.AFTER_ROLLBACK
+         └── 실패 시 후처리(보상 트랜잭션 등)
 ```
+
+### 트랜잭션의 원자성과 일관성 보장
+
+```
+@REQUIRES_NEW, @REQUIRED
+- 트랜잭션 경계를 명시적으로 분리/참여
+- 커밋/롤백의 단위를 명확하게 제어
+- 예: 멱등성 체크는 독립적으로(@REQUIRES_NEW), 이체는 함께(@REQUIRED)
+
+TransactionPhase.AFTER_COMMIT, AFTER_ROLLBACK, BEFORE_COMMIT
+- 트랜잭션 생명주기의 특정 시점에 로직 실행
+- 트랜잭션 상태에 따른 후처리 보장
+- 예: 이체 성공 시 알림(AFTER_COMMIT), 실패 시 보상(AFTER_ROLLBACK)
+```
+
+### 공통된 지향점
+
+```
+데이터 무결성 보장
+- @REQUIRES_NEW: 독립적인 트랜잭션으로 분리하여 보장
+- AFTER_COMMIT: 트랜잭션이 완전히 커밋된 후 후속 처리
+
+실패 시나리오 대응
+- @REQUIRED: 부모 트랜잭션과 함께 롤백
+- AFTER_ROLLBACK: 실패 시 보상 트랜잭션 실행
+
+작업의 순서 보장
+- @REQUIRES_NEW + @REQUIRED: 명시적인 실행 순서
+- BEFORE_COMMIT, AFTER_COMMIT: 암묵적인 실행 순서
+```
+
+### 사용 패턴의 유사성
+
+```
+멱등성 처리:
+@REQUIRES_NEW를 통한 체크:
+  checkIdempotency(@REQUIRES_NEW)
+  -> executeTransfer(@REQUIRED)
+
+이벤트를 통한 체크:
+  @TransactionalEventListener(phase = BEFORE_COMMIT)
+  handleIdempotencyCheck()
+  -> executeTransfer()
+  -> AFTER_COMMIT/AFTER_ROLLBACK
+
+상태 변경:
+@REQUIRES_NEW를 통한 처리:
+  executeTransfer(@REQUIRED)
+  -> markAsCompleted(@REQUIRES_NEW)
+
+이벤트를 통한 처리:
+  executeTransfer()
+  -> AFTER_COMMIT: markAsCompleted()
+  -> AFTER_ROLLBACK: markAsFailed()
+```
+
+### 보상 이벤트 처리 방법
+
+#### 다른 이벤트 발행
+
+```java
+
+@TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+public void handleTransactionFailed(TransactionFailedEvent event) {
+    // 새로운 보상 이벤트 발행
+    eventPublisher.publishEvent(new CompensationEvent(event.getTransactionId()));
+}
+```
+
+#### 보상 트랜잭션 서비스 직접 실행
+
+```java
+
+@TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+public void handleTransactionFailed(TransactionFailedEvent event) {
+    // 실패한 트랜잭션에 대한 보상 처리
+    compensationService.process(event.getTransactionId());
+}
+```
+
+### 비동기 보상 처리
+
+```java
+
+@TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+public void handleTransactionFailed(TransactionFailedEvent event) {
+    // 비동기로 보상 처리 큐에 메시지 전송
+    compensationQueueService.sendCompensationMessage(event.getTransactionId());
+}
+```
+
+### 상태 업데이트 (현재 예시 프로젝트 방식)
+
+```java
+
+@TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+@Transactional(propagation = Propagation.REQUIRES_NEW)
+public void handleTransactionFailed(TransactionFailedEvent event) {
+    // 트랜잭션 상태를 FAILED로 업데이트
+    transactionRecordService.markAsFailed(event.getTransactionId());
+}
+```
+
 ## axon 이벤트 소싱
 ```
 Commands:
