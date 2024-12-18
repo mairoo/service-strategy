@@ -9,59 +9,50 @@ import kr.co.pincoin.study.repository.MyBalanceRepository;
 import kr.co.pincoin.study.repository.MyTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-@Service
-@Transactional
-@RequiredArgsConstructor
 @Slf4j
+@Service
+@RequiredArgsConstructor
 public class MyTransactionService {
 
     private final MyBalanceRepository myBalanceRepository;
-
     private final MyTransactionRepository myTransactionRepository;
 
+    @Transactional
     public void transfer(String transactionId, Long fromAccountId, Long toAccountId,
         BigDecimal amount) {
-        MyTransaction transaction = checkIdempotency(transactionId);
-        if (transaction != null) {
-            return;
+        // 멱등성 체크는 별도 트랜잭션으로 처리
+        MyTransaction existingTx = checkIdempotency(transactionId);
+        if (existingTx != null) {
+            if (existingTx.getStatus() == MyTransactionStatus.COMPLETED) {
+                return; // 이미 처리된 거래
+            }
+            throw new IllegalStateException("처리 중인 거래가 있습니다.");
         }
 
-        transaction = createTransaction(transactionId, fromAccountId, toAccountId, amount);
+        MyTransaction transaction = createTransaction(transactionId, fromAccountId, toAccountId,
+            amount);
 
         try {
-            processWithdrawal(fromAccountId, amount);
-            processDeposit(toAccountId, amount);
-
+            executeTransfer(fromAccountId, toAccountId, amount);
             markTransactionComplete(transaction);
             sendNotification(transactionId, amount);
-
-        } catch (ObjectOptimisticLockingFailureException e) {
-            markTransactionFailed(transaction);
-            throw new IllegalStateException("동시 거래로 인한 낙관적 락 충돌이 발생했습니다. 다시 시도해 주세요.");
         } catch (Exception e) {
             markTransactionFailed(transaction);
             throw e;
         }
     }
 
-    private MyTransaction checkIdempotency(String transactionId) {
-        MyTransaction existingTx = myTransactionRepository.findByTransactionId(transactionId)
-            .orElse(null);
-
-        if (existingTx != null) {
-            if (existingTx.getStatus() == MyTransactionStatus.COMPLETED) {
-                return existingTx; // 이미 처리된 거래
-            }
-            throw new IllegalStateException("처리 중인 거래가 있습니다.");
-        }
-        return null;
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected MyTransaction checkIdempotency(String transactionId) {
+        return myTransactionRepository.findByTransactionId(transactionId).orElse(null);
     }
 
-    private MyTransaction createTransaction(String transactionId, Long fromAccountId,
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected MyTransaction createTransaction(String transactionId, Long fromAccountId,
         Long toAccountId,
         BigDecimal amount) {
         MyTransaction myTransaction = new MyTransaction(transactionId, fromAccountId, toAccountId,
@@ -69,26 +60,29 @@ public class MyTransactionService {
         return myTransactionRepository.save(myTransaction);
     }
 
-    private void processWithdrawal(Long accountId, BigDecimal amount) {
-        MyBalance myBalance = myBalanceRepository.findByAccountId(accountId)
+    @Transactional(propagation = Propagation.REQUIRED)
+    protected void executeTransfer(Long fromAccountId, Long toAccountId, BigDecimal amount) {
+        MyBalance fromAccount = myBalanceRepository.findByAccountId(fromAccountId)
             .orElseThrow(() -> new IllegalArgumentException("출금 계좌가 존재하지 않습니다."));
 
-        myBalance.decrease(amount);
-    }
-
-    private void processDeposit(Long accountId, BigDecimal amount) {
-        MyBalance myBalance = myBalanceRepository.findByAccountId(accountId)
+        MyBalance toAccount = myBalanceRepository.findByAccountId(toAccountId)
             .orElseThrow(() -> new IllegalArgumentException("입금 계좌가 존재하지 않습니다."));
 
-        myBalance.increase(amount);
+        fromAccount.decrease(amount);
+        toAccount.increase(amount);
+
+        myBalanceRepository.save(fromAccount);
+        myBalanceRepository.save(toAccount);
     }
 
-    private void markTransactionComplete(MyTransaction myTransaction) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected void markTransactionComplete(MyTransaction myTransaction) {
         myTransaction.markAsCompleted();
         myTransactionRepository.save(myTransaction);
     }
 
-    private void markTransactionFailed(MyTransaction myTransaction) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    protected void markTransactionFailed(MyTransaction myTransaction) {
         myTransaction.markAsFailed();
         myTransactionRepository.save(myTransaction);
     }
@@ -99,7 +93,7 @@ public class MyTransactionService {
 
     private void sendEmailNotification(String transactionId, BigDecimal amount) {
         try {
-            Thread.sleep(2000); // 2초 지연
+            Thread.sleep(2000);
             log.debug("이메일 발송 완료. 거래ID: {}, 송금액: {}", transactionId, amount);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
