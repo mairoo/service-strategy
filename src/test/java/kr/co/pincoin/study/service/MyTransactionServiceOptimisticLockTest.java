@@ -31,7 +31,7 @@ class MyTransactionServiceOptimisticLockTest {
     private static final BigDecimal TRANSFER_AMOUNT = new BigDecimal("10.00");
     private static final int CONCURRENT_THREADS = 5;
     @Autowired
-    private MyTransactionService myTransactionService;
+    private MyTransactionServiceV2 myTransactionService;
     @Autowired
     private MyBalanceRepository myBalanceRepository;
 

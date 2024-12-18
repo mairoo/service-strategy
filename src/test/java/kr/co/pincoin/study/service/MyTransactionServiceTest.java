@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 class MyTransactionServiceTest {
 
     @Autowired
-    private MyTransactionService myTransactionService;
+    private MyTransactionServiceV2 myTransactionService;
 
     @Autowired
     private MyBalanceRepository myBalanceRepository;

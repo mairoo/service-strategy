@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MyTransactionService {
+public class MyTransactionServiceV2 {
 
     private final MyBalanceRepository myBalanceRepository;
     private final MyTransactionRepository myTransactionRepository;
