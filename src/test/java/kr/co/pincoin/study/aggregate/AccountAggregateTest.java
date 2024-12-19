@@ -8,8 +8,10 @@ import kr.co.pincoin.study.event.AccountEvents.MoneyDebitedEvent;
 import org.axonframework.test.aggregate.AggregateTestFixture;
 import org.axonframework.test.aggregate.FixtureConfiguration;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+@DisplayName("계좌 애그리게잇 테스트")
 class AccountAggregateTest {
 
   private FixtureConfiguration<AccountAggregate> fixture;
@@ -20,6 +22,7 @@ class AccountAggregateTest {
   }
 
   @Test
+  @DisplayName("신규 계좌 생성시 초기 잔액이 정상적으로 설정되어야 한다")
   void createAccount() {
     String accountId = "test-account";
     BigDecimal initialBalance = BigDecimal.valueOf(1000);
@@ -30,6 +33,7 @@ class AccountAggregateTest {
   }
 
   @Test
+  @DisplayName("잔액이 충분할 경우 송금이 정상적으로 처리되어야 한다")
   void transferMoney_withSufficientBalance() {
     String sourceAccountId = "source-account";
     String targetAccountId = "target-account";
@@ -45,6 +49,7 @@ class AccountAggregateTest {
   }
 
   @Test
+  @DisplayName("잔액이 부족할 경우 송금이 실패해야 한다")
   void transferMoney_withInsufficientBalance() {
     String sourceAccountId = "source-account";
     String targetAccountId = "target-account";
@@ -59,6 +64,7 @@ class AccountAggregateTest {
   }
 
   @Test
+  @DisplayName("음수 금액 송금 시도시 예외가 발생해야 한다")
   void transferMoney_withNegativeAmount() {
     String sourceAccountId = "source-account";
     String targetAccountId = "target-account";
