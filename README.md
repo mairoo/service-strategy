@@ -181,11 +181,18 @@ public void handleTransactionFailed(TransactionFailedEvent event) {
 ```
 
 ## axon 이벤트 소싱
+
 ```
 java -jar axonserver.jar
 ```
+
 - 8024: HTTP API 및 웹 대시보드: http://localhost:8024
 - 8124: gRPC 포트 (실제 애플리케이션 연동용)
+
+### AggregateLifecycle, SagaLifecycle
+
+- AggregateLifecycle: 주문, 사용자 계정 등 단일 도메인 객체의 일관성이 중요한 경우에 사용
+- SagaLifecycle: 주문-결제-배송과 같이 여러 도메인 객체가 관여하는 복잡한 비즈니스 프로세스 관리에 사용
 
 ```
 Commands:

@@ -77,6 +77,10 @@ public class AccountAggregate {
       throw new IllegalStateException("잔액이 부족합니다");
     }
 
+    // ❌ 이렇게 직접 상태를 변경하지 않습니다
+    // this.balance = this.balance.subtract(amount);
+
+    // ✅ 대신 이벤트를 아래와 같이 apply하여 상태를 변경합니다
     AggregateLifecycle.apply(new MoneyDebitedEvent(
         accountId,
         command.getTargetAccountId(),
