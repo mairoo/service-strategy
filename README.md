@@ -1,17 +1,43 @@
 # 다양한 서비스 로직 구현 전략
+
 목표:
+
 - 잔액의 무결성 보장
 - 거래의 멱등성 보장
 - 비동기 통보 이메일 발송(학습 목적 코드이므로 실제로는 2초 지연 후 로그 출력)
 
-서비스 로직의 진화 과정
+## 서비스 로직의 진화 과정
 
 1. 트랜잭션 스크립트 패턴
 2. 퍼사드 패턴
 3. 스프링 이벤트 패턴
 4. axon 이벤트 소싱 패턴
 
+## 타당성 분석 검토
+
+### 트랜잭션 스크립트 패턴 → 퍼사드 패턴으로의 확장
+
+- 확장 사유:
+    - 비즈니스 로직이 복잡해지면서 단순 트랜잭션 스크립트로는 관리가 어려워짐
+    - 여러 서비스 레이어의 조합이 필요한 복잡한 유스케이스 증가
+    - 서비스 레이어에 대한 단일 진입점 필요성
+
+### 퍼사드 패턴 → 스프링 이벤트로의 확장
+
+- 확장 사유:
+    - 강한 결합도를 가진 서비스 간 의존성을 낮출 필요성
+    - 부가적인 기능(알림, 로깅 등)을 메인 비즈니스 로직과 분리
+    - 비동기 처리가 필요한 케이스 증가
+
+### 스프링 이벤트 → Axon 이벤트 소싱으로의 확장
+
+- 확장 사유:
+    - 도메인 이벤트의 히스토리 추적 필요성
+    - 마이크로서비스 아키텍처로의 전환 고려
+    - 복잡한 분산 트랜잭션 처리 필요성
+
 ## 트랜잭션 스크립트 패턴
+
 ### transfer 메소드 흐름
 
 ```
@@ -23,6 +49,7 @@ transfer (@Transactional)
 ```
 
 ## 퍼사드 패턴
+
 ```
 TransactionFacade
    ├── IdempotencyService (@REQUIRES_NEW)
@@ -64,7 +91,7 @@ TransactionPhase.AFTER_COMMIT, AFTER_ROLLBACK, BEFORE_COMMIT
 - 예: 이체 성공 시 알림(AFTER_COMMIT), 실패 시 보상(AFTER_ROLLBACK)
 ```
 
-### 공통된 지향점
+### 스프링 트랜잭션 처리 전략과 스프링 이벤트 처리 전략의 공통된 지향점
 
 ```
 데이터 무결성 보장
@@ -113,8 +140,8 @@ TransactionPhase.AFTER_COMMIT, AFTER_ROLLBACK, BEFORE_COMMIT
 
 @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
 public void handleTransactionFailed(TransactionFailedEvent event) {
-    // 새로운 보상 이벤트 발행
-    eventPublisher.publishEvent(new CompensationEvent(event.getTransactionId()));
+  // 새로운 보상 이벤트 발행
+  eventPublisher.publishEvent(new CompensationEvent(event.getTransactionId()));
 }
 ```
 
@@ -125,8 +152,8 @@ public void handleTransactionFailed(TransactionFailedEvent event) {
 @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
 @Transactional(propagation = Propagation.REQUIRES_NEW)
 public void handleTransactionFailed(TransactionFailedEvent event) {
-    // 실패한 트랜잭션에 대한 보상 처리
-    compensationService.process(event.getTransactionId());
+  // 실패한 트랜잭션에 대한 보상 처리
+  compensationService.process(event.getTransactionId());
 }
 ```
 
@@ -136,8 +163,8 @@ public void handleTransactionFailed(TransactionFailedEvent event) {
 
 @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
 public void handleTransactionFailed(TransactionFailedEvent event) {
-    // 비동기로 보상 처리 큐에 메시지 전송
-    compensationQueueService.sendCompensationMessage(event.getTransactionId());
+  // 비동기로 보상 처리 큐에 메시지 전송
+  compensationQueueService.sendCompensationMessage(event.getTransactionId());
 }
 ```
 
@@ -148,12 +175,13 @@ public void handleTransactionFailed(TransactionFailedEvent event) {
 @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
 @Transactional(propagation = Propagation.REQUIRES_NEW)
 public void handleTransactionFailed(TransactionFailedEvent event) {
-    // 트랜잭션 상태를 FAILED로 업데이트
-    transactionRecordService.markAsFailed(event.getTransactionId());
+  // 트랜잭션 상태를 FAILED로 업데이트
+  transactionRecordService.markAsFailed(event.getTransactionId());
 }
 ```
 
 ## axon 이벤트 소싱
+
 ```
 Commands:
 - CreateTransactionCommand
