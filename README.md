@@ -181,6 +181,11 @@ public void handleTransactionFailed(TransactionFailedEvent event) {
 ```
 
 ## axon 이벤트 소싱
+```
+java -jar axonserver.jar
+```
+- 8024: HTTP API 및 웹 대시보드: http://localhost:8024
+- 8124: gRPC 포트 (실제 애플리케이션 연동용)
 
 ```
 Commands:
