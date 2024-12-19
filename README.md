@@ -12,6 +12,8 @@
 2. 퍼사드 패턴
 3. 스프링 이벤트 패턴
 4. axon 이벤트 소싱 패턴
+  - AggregateLifecycle: Aggregate 도메인 관점
+  - SagaLifecycle: 프로세스 동작, 행위 관점
 
 ## 타당성 분석 검토
 
@@ -193,18 +195,6 @@ java -jar axonserver.jar
 
 - AggregateLifecycle: 주문, 사용자 계정 등 단일 도메인 객체의 일관성이 중요한 경우에 사용
 - SagaLifecycle: 주문-결제-배송과 같이 여러 도메인 객체가 관여하는 복잡한 비즈니스 프로세스 관리에 사용
-
-```
-Commands:
-- CreateTransactionCommand
-- ExecuteTransferCommand
-- CompleteTransactionCommand
-
-Events:
-- TransactionCreatedEvent
-- TransferExecutedEvent
-- TransactionCompletedEvent
-```
 
 # 결론
 

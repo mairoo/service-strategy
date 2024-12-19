@@ -22,6 +22,12 @@ public class AccountEventHandler {
   // 처리된 트랜잭션 ID를 추적하기 위한 맵 (실제로는 DB를 사용해야 함)
   private final Map<String, Boolean> processedTransactions = new ConcurrentHashMap<>();
 
+  // AccountEventHandler: 부수 효과 처리 (@EventHandler)
+  // - 도메인 이벤트의 부수 효과 처리
+  // - 외부 시스템과의 통합
+  // - 이벤트 전파 및 모니터링
+  // - 감사 로그 생성
+
   @EventHandler
   public void on(AccountCreatedEvent event) {
     System.out.println("Account created: " + event.getAccountId() +
@@ -30,7 +36,7 @@ public class AccountEventHandler {
 
   @EventHandler
   public void on(MoneyDebitedEvent event) {
-    // 출금이 성공하면 입금 커맨드를 발행
+    // 1. 출금이 성공하면 입금 커맨드를 발행
     if (!processedTransactions.containsKey(event.getTransactionId())) {
       commandGateway.send(new CreditAccountCommand(
           event.getTargetAccountId(),

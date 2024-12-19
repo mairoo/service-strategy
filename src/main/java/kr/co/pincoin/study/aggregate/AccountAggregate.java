@@ -109,6 +109,11 @@ public class AccountAggregate {
     ));
   }
 
+  // 도메인 상태 업데이트 (@EventSourcingHandler)
+  // - 순수하게 도메인 상태만 관리
+  // - 모든 상태 변경은 이벤트의 결과
+  // - 외부 시스템과의 의존성 없음
+
   /**
    * 계좌 생성 이벤트 처리
    * <p>
