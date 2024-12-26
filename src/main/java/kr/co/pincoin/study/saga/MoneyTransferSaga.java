@@ -36,24 +36,22 @@ public class MoneyTransferSaga {
     this.amount = event.getAmount();
     this.transactionId = event.getTransactionId();
 
+    // CompletableFuture의 exceptionally() 핸들러가 보상 트랜잭션을 처리하도록 설정
     commandGateway.send(new CreditAccountCommand(
         targetAccountId,
         sourceAccountId,
         amount,
         transactionId
     )).exceptionally(throwable -> {
-      compensateDebit();
+      // 실패 시 보상 트랜잭션 실행
+      commandGateway.send(new CreditAccountCommand(
+          sourceAccountId,
+          targetAccountId,
+          amount,
+          transactionId + "-compensation"
+      ));
       return null;
     });
-  }
-
-  private void compensateDebit() {
-    commandGateway.send(new CreditAccountCommand(
-        sourceAccountId,
-        targetAccountId,
-        amount,
-        transactionId + "-compensation"
-    ));
   }
 
   @SagaEventHandler(associationProperty = "transactionId")
